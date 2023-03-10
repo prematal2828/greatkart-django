@@ -96,6 +96,74 @@ def activate(request, uidb64, token):
         messages.error(request, 'Invalid activation link')
         return redirect('register')
 
+
+def forgot_pass(request):
+    if request.method == 'POST':
+        email = request.POST['email']
+        if Account.objects.filter(email=email).exists():
+            user = Account.objects.get(email__exact=email)
+            current_site = get_current_site(request)
+            mail_subject = 'Reset your Password'
+            mail_message = render_to_string('accounts/reset_pass_email.html', {
+                'user': user,
+                'domain': current_site,
+                'uid': urlsafe_base64_encode(force_bytes(user.pk)),
+                'token': default_token_generator.make_token(user),
+            })
+            to_email = email
+            send_email = EmailMessage(mail_subject, mail_message, to=[to_email])
+            send_email.send()
+
+            messages.success(request, 'Password reset link sent to your email')
+
+            return redirect('login')
+        else:
+            messages.error(request, 'Account does not exist')
+            return redirect('forgot_pass')
+    return render(request, 'accounts/forgot_pass.html')
+
+
+def reset_pass_validate(request, uidb64, token):
+    try:
+        uid = urlsafe_base64_decode(uidb64).decode()
+        user = Account._default_manager.get(pk=uid)
+
+    except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
+        user = None
+
+
+    if user is not None and default_token_generator.check_token(user, token):
+        request.session['uid'] = uid
+
+        messages.success(request, 'Please reset your password')
+        return redirect('reset_pass_confirm')
+    else:
+        messages.error(request, 'Invalid reset link')
+        return redirect('forgot_pass')
+
+
+def reset_pass_confirm(request):
+    if request.method == 'POST':
+        password = request.POST['password']
+        password2 = request.POST['password2']
+        if password == password2:
+            uid = request.session.get('uid')
+            try:
+                user = Account.objects.get(pk=uid)
+            except Account.DoesNotExist:
+                messages.error(request, 'Invalid reset link')
+                return redirect('forgot_pass')
+
+            user.set_password(password)
+            user.save()
+            messages.success(request, 'Password reset successful')
+            return redirect('login')
+        else:
+            messages.error(request, 'Passwords do not match')
+            return redirect('reset_pass_confirm')
+    return render(request, 'accounts/reset_pass_confirm.html')
+
+
 @login_required(login_url='login')
 def dashboard(request):
     return render(request, 'accounts/dashboard.html')

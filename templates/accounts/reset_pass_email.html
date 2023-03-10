@@ -1,0 +1,8 @@
+{% autoescape off %}
+    Hi {{ user.first_name }}, please reset your account password by clicking the link below.
+
+    http://{{ domain }}{% url 'reset_pass_validate' uidb64=uid token=token %}
+
+
+
+{% endautoescape %}
