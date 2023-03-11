@@ -68,3 +68,6 @@ def search(request):
             return render(request, 'store.html', context)
 
     return render(request, 'store.html')
+
+
+

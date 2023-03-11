@@ -8,6 +8,8 @@ from django.template.loader import render_to_string
 from django.utils.encoding import force_bytes
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 
+from cart.models import Cart, CartItem
+from cart.views import _cart_id
 from .forms import RegistrationForm
 from .models import Account
 
@@ -61,6 +63,17 @@ def login(request):
         user = auth.authenticate(email=email, password=password)
 
         if user is not None:
+            try:
+                cart = Cart.objects.get(cart_id=_cart_id(request))
+                is_cart_item_exists = CartItem.objects.filter(cart_id=cart).exists()
+                if is_cart_item_exists:
+                    cart_item = CartItem.objects.filter(cart_id=cart)
+
+                    for item in cart_item:
+                        item.user = user
+                        item.save()
+            except:
+                pass
             auth.login(request, user)
             messages.success(request, "Logged In")
             return redirect('dashboard')
@@ -130,7 +143,6 @@ def reset_pass_validate(request, uidb64, token):
 
     except(TypeError, ValueError, OverflowError, Account.DoesNotExist):
         user = None
-
 
     if user is not None and default_token_generator.check_token(user, token):
         request.session['uid'] = uid
